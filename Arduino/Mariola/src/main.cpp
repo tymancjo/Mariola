@@ -163,8 +163,7 @@ void loop()
         Serial.print(D);
         Serial.println(" ");
       }
-    }
-    break;
+    } break;
 
     case 3:
     {
@@ -186,11 +185,17 @@ void loop()
         float C = abs((param[2]) / maxSteps);
         float D = abs((param[3]) / maxSteps);
 
+        // calculating the max speed values
+        float Vmax1 = 1.0 * newSpeed * A;
+        float Vmax2 = 1.0 * newSpeed * B;
+        float Vmax3 = 1.0 * newSpeed * C;
+        float Vmax4 = 1.0 * newSpeed * D;
+
         // setting speed with respect to the set distance
-        M1.setMaxSpeed(newSpeed * A);
-        M2.setMaxSpeed(newSpeed * B);
-        M3.setMaxSpeed(newSpeed * C);
-        M4.setMaxSpeed(newSpeed * D);
+        M1.setMaxSpeed( Vmax1 );
+        M2.setMaxSpeed( Vmax2 );
+        M3.setMaxSpeed( Vmax3 );
+        M4.setMaxSpeed( Vmax4 );
 
         // distances to reavel for each wheel
         long D1 = ((long)param[0] * wheel_const);
@@ -204,10 +209,10 @@ void loop()
         // derivated formula is:
         // accl = (Vmax^2)/Steps
 
-        float a1 = sq(newSpeed * A) / D1;
-        float a2 = sq(newSpeed * B) / D2;
-        float a3 = sq(newSpeed * C) / D3;
-        float a4 = sq(newSpeed * D) / D4;
+        float a1 = Vmax1 * Vmax1 / abs(D1);
+        float a2 = Vmax2 * Vmax2 / abs(D2);
+        float a3 = Vmax3 * Vmax3 / abs(D3);
+        float a4 = Vmax4 * Vmax4 / abs(D4);
 
         M1.setAcceleration(a1);
         M2.setAcceleration(a2);
@@ -226,19 +231,36 @@ void loop()
         isIdle = false;
 
         // confirming the command
-
+        Serial.print(D1);
+        Serial.print(" ");
         Serial.print(a1);
+        Serial.print(" ");
+        Serial.print(Vmax1);
+        Serial.print(" : ");
+      
+        Serial.print(D2);
         Serial.print(" ");
         Serial.print(a2);
         Serial.print(" ");
+        Serial.print(Vmax2);
+        Serial.print(" : ");
+
+        Serial.print(D3);
+        Serial.print(" ");
         Serial.print(a3);
         Serial.print(" ");
-        Serial.print(a4);
-        Serial.println(" ");
-      }
-    }
+        Serial.print(Vmax3);
+        Serial.print(" : ");
 
-    break;
+        Serial.print(D4);
+        Serial.print(" ");
+        Serial.print(a4);
+        Serial.print(" ");
+        Serial.print(Vmax4);
+        Serial.println("");
+      
+      }
+    } break;
 
     default:
       // statements
