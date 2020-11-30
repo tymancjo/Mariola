@@ -12,14 +12,13 @@ float maxSpeed = 4000.0;
 float maxAccl = 500.0;
 float accl = maxAccl;
 float speed = maxSpeed;
-const int pulses_per_step = 200 * 8;    // for 1/8 step
-
+const int pulses_per_step = 200 * 8; // for 1/8 step
 
 // mechanical dimensions based data
 const float A = 185.0; //[mm] dist between wheels (width)
-const float D = 65.0;    //[mm] wheel diameter
+const float D = 65.0;  //[mm] wheel diameter
 const float wheel_lenght = PI * D;
-const float wheel_const = 10 * pulses_per_step / wheel_lenght; 
+const float wheel_const = 10 * pulses_per_step / wheel_lenght;
 const float turn_const = A / (180.0 * D);
 
 // ***********************************
@@ -34,6 +33,10 @@ char messageFromPC[numChars] = {0};
 int param[5];
 int command;
 // ***********************************
+// other general variabes
+unsigned long idleTime;
+unsigned long idleTimeDelay = 2000; // [ms] of waiting to disengage stepper drivers
+bool isIdle = false;
 
 // Functions declarations
 void recvWithStartEndMarkers();
@@ -109,26 +112,25 @@ void loop()
       goStop();
       break;
 
-    case 1:
+    case 2:
     {
-      // execute normal move command
-      
-      // limiting the given speed to max allowed
-      // param[4] = constrain(param[4], 0, maxSpeed);
-
+      // executing typical Mariola move
+      // reading the desired max speed
       float newSpeed = param[4];
       if (newSpeed <= 0)
         newSpeed = speed;
       speed = newSpeed;
+      // limiting the max speed to the predefined range only
+      speed = constrain(newSpeed, 0, maxSpeed);
 
-      float maxSteps = 1.0 *max(max(abs(param[0]), abs(param[1])), max(abs(param[2]), abs(param[3])));
+      float maxSteps = 1.0 * max(max(abs(param[0]), abs(param[1])), max(abs(param[2]), abs(param[3])));
 
       if (maxSteps > 0)
       {
-        float A =  abs((param[0]) / maxSteps);
-        float B =  abs((param[1]) / maxSteps);
-        float C =  abs((param[2]) / maxSteps);
-        float D =  abs((param[3]) / maxSteps);
+        float A = abs((param[0]) / maxSteps);
+        float B = abs((param[1]) / maxSteps);
+        float C = abs((param[2]) / maxSteps);
+        float D = abs((param[3]) / maxSteps);
 
         // setting speed with respect to the set distance
         M1.setMaxSpeed(newSpeed * A);
@@ -142,14 +144,15 @@ void loop()
         M4.setAcceleration(maxAccl * D);
 
         // setting distance for each wheel
-        M1.move((long) param[0] * wheel_const);
-        M2.move((long) param[1] * wheel_const);
-        M3.move((long) param[2] * wheel_const);
-        M4.move((long) param[3] * wheel_const);
+        M1.move((long)param[0] * wheel_const);
+        M2.move((long)param[1] * wheel_const);
+        M3.move((long)param[2] * wheel_const);
+        M4.move((long)param[3] * wheel_const);
 
         // turning on the drivers
         // PB5 (gpio 13) is for !enable
         PORTB &= 0b11011111;
+        isIdle = false;
 
         Serial.print(A);
         Serial.print(" ");
@@ -159,8 +162,79 @@ void loop()
         Serial.print(" ");
         Serial.print(D);
         Serial.println(" ");
+      }
+    }
+    break;
 
-        // delay(10);
+    case 3:
+    {
+      // execute move command with ramped acceleration
+      // solution implemented.
+
+      float newSpeed = param[4];
+      if (newSpeed <= 0)
+        newSpeed = speed;
+      // limiting the max speed to the predefined range only
+      speed = constrain(newSpeed, 0, maxSpeed);
+
+      float maxSteps = 1.0 * max(max(abs(param[0]), abs(param[1])), max(abs(param[2]), abs(param[3])));
+
+      if (maxSteps > 0)
+      {
+        float A = abs((param[0]) / maxSteps);
+        float B = abs((param[1]) / maxSteps);
+        float C = abs((param[2]) / maxSteps);
+        float D = abs((param[3]) / maxSteps);
+
+        // setting speed with respect to the set distance
+        M1.setMaxSpeed(newSpeed * A);
+        M2.setMaxSpeed(newSpeed * B);
+        M3.setMaxSpeed(newSpeed * C);
+        M4.setMaxSpeed(newSpeed * D);
+
+        // distances to reavel for each wheel
+        long D1 = ((long)param[0] * wheel_const);
+        long D2 = ((long)param[1] * wheel_const);
+        long D3 = ((long)param[2] * wheel_const);
+        long D4 = ((long)param[3] * wheel_const);
+
+        // Working on the acceleration calculations per speed and steps
+        // the required acceleration for to keep the speed changes
+        // per the triangle shape (ref to video desc on GH)
+        // derivated formula is:
+        // accl = (Vmax^2)/Steps
+
+        float a1 = sq(newSpeed * A) / D1;
+        float a2 = sq(newSpeed * B) / D2;
+        float a3 = sq(newSpeed * C) / D3;
+        float a4 = sq(newSpeed * D) / D4;
+
+        M1.setAcceleration(a1);
+        M2.setAcceleration(a2);
+        M3.setAcceleration(a3);
+        M4.setAcceleration(a4);
+
+        // setting distance for each wheel
+        M1.move(D1);
+        M2.move(D2);
+        M3.move(D3);
+        M4.move(D4);
+
+        // turning on the drivers
+        // PB5 (gpio 13) is for !enable
+        PORTB &= 0b11011111;
+        isIdle = false;
+
+        // confirming the command
+
+        Serial.print(a1);
+        Serial.print(" ");
+        Serial.print(a2);
+        Serial.print(" ");
+        Serial.print(a3);
+        Serial.print(" ");
+        Serial.print(a4);
+        Serial.println(" ");
       }
     }
 
@@ -180,8 +254,24 @@ void loop()
 
   if (M1.distanceToGo() == 0 && M2.distanceToGo() == 0 && M3.distanceToGo() == 0 && M4.distanceToGo() == 0)
   {
-    // PB5 (input 13) is for !enable
-    PORTB |= 0b00100000;
+
+    if (!isIdle)
+    {
+      isIdle = true;
+      idleTime = millis();
+    }
+    else
+    {
+      if (millis() - idleTime > idleTimeDelay)
+      {
+        // PB5 (input 13) is for !enable
+        PORTB |= 0b00100000;
+      }
+    }
+  }
+  else
+  {
+    isIdle = false;
   }
 
   // kicking off the steppers pulses
@@ -246,19 +336,19 @@ void parseData()
   strcpy(messageFromPC, strtokIndx); // copy it to messageFromPC
 
   strtokIndx = strtok(NULL, ",");
-  param[0] = (int) atof(strtokIndx); // convert this part to a int
+  param[0] = (int)atof(strtokIndx); // convert this part to a int
 
   strtokIndx = strtok(NULL, ",");
-  param[1] = (int) atof(strtokIndx); // convert this part to a int
+  param[1] = (int)atof(strtokIndx); // convert this part to a int
 
   strtokIndx = strtok(NULL, ",");
-  param[2] = (int) atof(strtokIndx); // convert this part to a int
+  param[2] = (int)atof(strtokIndx); // convert this part to a int
 
   strtokIndx = strtok(NULL, ",");
-  param[3] = (int) atof(strtokIndx); // convert this part to a int
+  param[3] = (int)atof(strtokIndx); // convert this part to a int
 
   strtokIndx = strtok(NULL, ",");
-  param[4] = (int) atof(strtokIndx); // convert this part to a int
+  param[4] = (int)atof(strtokIndx); // convert this part to a int
 }
 
 void goStop()
