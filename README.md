@@ -22,9 +22,10 @@ The arduino code was made using the vscode with PlatformIO addon. And is availab
 
 It's using serial received data (which are transferred by BT, but might be just done via regular UART) that are following the command syntax:
 
-_<1,W1,W2,W3,W4,Spd>_
+_<2,W1,W2,W3,W4,Spd>_
 
 where:
+- 2 is the default move command code
 - W1 - distance for wheel 1 (right back) in cm
 - W2 - distance for wheel 2 (right front) in cm
 - W3 - distance for wheel 3 (left back) in cm

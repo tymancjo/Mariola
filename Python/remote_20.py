@@ -30,7 +30,7 @@ D3 = s.getCharacteristics()[0]
 try:
 
     while True:
-        print("Syntax: dist,angle,turn_deg")
+        print("Set the command parameters: dist,angle,turn_deg")
         command = input(" Command : ")
         
         if command.lower() in ["quit", "exit", "off"]:
@@ -59,7 +59,7 @@ try:
 
 
         
-        command = f"<1,{w1},{w2},{w3},{w4},0>"
+        command = f"<3,{w1},{w2},{w3},{w4},1500>"
 
         print(bytes(command, "utf-8"))
         dlugosc = (len(bytes(command, "utf-8")))
@@ -67,9 +67,9 @@ try:
         if dlugosc > 19:
 
             commands = []
-            commands.append(f"<1,{w1},")
+            commands.append(f"<3,{w1},")
             commands.append(f"{w2},{w3},")
-            commands.append(f"{w4},0>")
+            commands.append(f"{w4},1500>")
 
             for com in commands:
                 try:

@@ -24,6 +24,7 @@ const float turn_const = A / (180.0 * D);
 // ***********************************
 // Stuff for serial communication use
 bool newData = false;
+bool fakeNewData = false;
 const byte numChars = 48;
 char receivedChars[numChars];
 char tempChars[numChars];
@@ -94,13 +95,14 @@ void loop()
   // grabstuff from serial
   recvWithStartEndMarkers();
   // if we have some new data...
-  if (newData == true)
+  if (newData == true || fakeNewData == true)
   {
 
     strcpy(tempChars, receivedChars);
 
-    parseData();
+    if (newData == true) parseData();
     newData = false;
+    fakeNewData = false;
 
     Serial.print("command: ");
     Serial.println(command);
@@ -111,6 +113,61 @@ void loop()
       // stop action
       goStop();
       break;
+
+
+    case 1:
+    {
+      // translating the Dz3 command to Mariola command
+      // for control intercompatibility 
+      // for command 1 the structure is:
+      // <1,A,B,C> where:
+      // A - the distance
+      // B - turn angle
+      // C - speed
+      //
+      // Mariola expects:
+      // <2,a,b,c,d,v>
+      // a,b,c,d - steps for each wheel
+      // v - the speed
+      //
+      // The idea is to not recreate the entire case 2 statement 
+      // functionality but to cheat a little by making fake serial command.
+      //
+      // Firstly - we need to do some math - to calculate the required steps 
+      // for each wheel.
+      // 
+      // from the math done in python remote control file we know:
+      // w4 = int((Dy + Dx - w * dims))
+      // w3 = int((Dy - Dx - w * dims))
+      // w2 = int((Dy - Dx + w * dims))
+      // w1 = int((Dy + Dx + w * dims))
+      // in case of this hack the Dx is 0
+      // w4 = int((Dy - w * dims))
+      // w3 = int((Dy - w * dims))
+      // w2 = int((Dy + w * dims))
+      // w1 = int((Dy + w * dims))
+      // where 
+      // dims = 4.5+9 = 13.5
+      // w = radians(B) 
+      long A = param[0];
+      long B = param[1];
+      long C = param[2];
+      // below gets wonky as need to be in [cm]
+      float w = (B * 71.0) / 4068;
+      // const float dims = 0.5 * 180 / (180.0 * 65 * wheel_const);
+      const float dims = 18.5;
+
+      // faking the new transsmission
+      param[3] = (int) A - w * dims;
+      param[2] = (int) A - w * dims;
+      param[1] = (int) A + w * dims;
+      param[0] = (int) A + w * dims;
+
+      command = 2;
+      param[4] = C;
+      fakeNewData = true;
+
+    } break;
 
     case 2:
     {
@@ -154,14 +211,14 @@ void loop()
         PORTB &= 0b11011111;
         isIdle = false;
 
-        Serial.print(A);
-        Serial.print(" ");
-        Serial.print(B);
-        Serial.print(" ");
-        Serial.print(C);
-        Serial.print(" ");
-        Serial.print(D);
-        Serial.println(" ");
+        // Serial.print(A);
+        // Serial.print(" ");
+        // Serial.print(B);
+        // Serial.print(" ");
+        // Serial.print(C);
+        // Serial.print(" ");
+        // Serial.print(D);
+        // Serial.println(" ");
       }
     } break;
 
