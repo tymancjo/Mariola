@@ -39,6 +39,17 @@ unsigned long idleTime;
 unsigned long idleTimeDelay = 2000; // [ms] of waiting to disengage stepper drivers
 bool isIdle = false;
 
+// for handle programmmed routes
+bool inProgramMode = false;
+bool inProgramLoop = false;
+const int maxStepsNumber = 100; // predefined max number of program steps
+int program_steps = 0;
+int current_program_step = 0;
+// arrays to keep program steps
+int memoryL[maxStepsNumber];
+int memoryA[maxStepsNumber];
+int memoryS[maxStepsNumber];
+
 // Functions declarations
 void recvWithStartEndMarkers();
 void parseData();
@@ -153,7 +164,7 @@ void loop()
       long B = param[1];
       long C = param[2];
       // below gets wonky as need to be in [cm]
-      float w = (B * 71.0) / 4068;
+      float w = (B * 53.0) / 4068;
       // const float dims = 0.5 * 180 / (180.0 * 65 * wheel_const);
       const float dims = 18.5;
 
@@ -319,6 +330,51 @@ void loop()
       }
     } break;
 
+    case 20:
+        {
+        // add to sequence
+          if (program_steps < maxStepsNumber)
+          {
+
+            memoryL[program_steps] = param[0];
+            memoryA[program_steps] = param[1];
+            memoryS[program_steps] = param[2];
+
+            program_steps++;
+          }
+        // addToSequence(param[0], param[1], param[2]);
+        }
+        break;
+
+    case 30:
+        // execute sequence
+        if (program_steps > 0)
+        {
+          // if we have some steps recorder we can ste flag that we are going to execute program
+          inProgramMode = true;
+          inProgramLoop = false;
+          // resseting the step conter
+          current_program_step = 0;
+        }
+        break;
+
+    case 33:
+        // execute sequence
+        if (program_steps > 0)
+        {
+          // if we have some steps recorder we can ste flag that we are going to execute program
+          inProgramMode = true;
+          inProgramLoop = true;
+          // resseting the step conter
+          current_program_step = 0;
+        }
+        break;
+
+      case 39:
+        //clearing the progam memory
+        program_steps = 0;
+        break;
+
     default:
       // statements
       break;
@@ -333,20 +389,39 @@ void loop()
 
   if (M1.distanceToGo() == 0 && M2.distanceToGo() == 0 && M3.distanceToGo() == 0 && M4.distanceToGo() == 0)
   {
+    if (inProgramMode && current_program_step < program_steps && !fakeNewData)
+    {
+      // moving normal command
+      param[0] = memoryL[current_program_step];
+      param[1] = memoryA[current_program_step];
+      param[2] = memoryS[current_program_step];
+      command = 1;
+      fakeNewData = true;
+      current_program_step++;
 
-    if (!isIdle)
-    {
-      isIdle = true;
-      idleTime = millis();
-    }
-    else
-    {
-      if (millis() - idleTime > idleTimeDelay)
+    } else {
+      if (inProgramMode && current_program_step == program_steps){
+          if (inProgramLoop) {
+            current_program_step = 0;
+          }
+          else inProgramMode = false;
+      }
+
+      if (!isIdle)
       {
-        // PB5 (input 13) is for !enable
-        PORTB |= 0b00100000;
+        isIdle = true;
+        idleTime = millis();
+      }
+      else
+      {
+        if (millis() - idleTime > idleTimeDelay)
+        {
+          // PB5 (input 13) is for !enable
+          PORTB |= 0b00100000;
+        }
       }
     }
+
   }
   else
   {
@@ -442,6 +517,31 @@ void goStop()
   M2.stop();
   M3.stop();
   M4.stop();
+
+  inProgramLoop = false;
+  inProgramMode = false;
+  current_program_step = 0;
+}
+
+void addToSequence(int p1, int p2, int p3)
+{
+  // adding the step to memory
+  if (program_steps < maxStepsNumber)
+  {
+
+    memoryL[program_steps] = p1;
+    memoryA[program_steps] = p2;
+    memoryS[program_steps] = p3;
+
+    program_steps++;
+
+    // Serial.print("Step added, total: ");
+    // Serial.print(program_steps);
+    // Serial.println(" steps");
+  }
+
+  // else
+    // Serial.print("Memory full");
 }
 
 float myDivide(float A, float B)
