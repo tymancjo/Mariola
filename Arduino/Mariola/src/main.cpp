@@ -1,6 +1,13 @@
 #include <Arduino.h>
 #include <AccelStepper.h>
 #include <MultiStepper.h>
+#include <SPI.h>
+#include <mcp2515.h>
+
+
+// Setting up the CAN communication structure
+struct can_frame canMsg;
+MCP2515 mcp2515(10); // 10 is the pin for CS
 
 // defining the stepper motor bindings
 AccelStepper M1(AccelStepper::DRIVER, 2, 3);
@@ -52,6 +59,7 @@ int memoryS[maxStepsNumber];
 
 // Functions declarations
 void recvWithStartEndMarkers();
+void recFromCan();
 void parseData();
 void goStop();
 float myDivide(float A, float B);
@@ -59,16 +67,22 @@ float myDivide(float A, float B);
 void setup()
 {
   // put your setup code here, to run once:
+  // Preparing the CAN module 
+  mcp2515.reset();
+  mcp2515.setBitrate(CAN_500KBPS, MCP_8MHZ);
+  mcp2515.setNormalMode();
 
   // kicking off serial
   Serial.begin(9600);
 
   // Pin modes set
-  pinMode(13, OUTPUT);
+  pinMode(A0, OUTPUT); // For the motors disabling
 
   // Port operation to disable both stepper motors (to not keep them under current)
   // PB5 (input 13) is for !enable
-  PORTB |= 0b00100000;
+  // PORTB |= 0b00100000;
+  // PC1 - is input A0
+  PORTC |= 0b00000001;
 
   // settuping up the stepper motors
   // max speed;
@@ -87,12 +101,6 @@ void setup()
   M3.setSpeed(maxSpeed);
   M4.setSpeed(maxSpeed);
 
-  // for the needs of initial test
-  // M1.move(10000);
-  // M2.move(10000);
-  // M3.move(10000);
-  // M4.move(10000);
-
   delay(1000);
 }
 
@@ -104,14 +112,19 @@ void loop()
   param[4] = maxSpeed;
 
   // grabstuff from serial
-  recvWithStartEndMarkers();
+  // recvWithStartEndMarkers();
+
+  // To go with CAN new function need replace the one above
+  recFromCan();
+
+
   // if we have some new data...
   if (newData == true || fakeNewData == true)
   {
 
-    strcpy(tempChars, receivedChars);
+    // strcpy(tempChars, receivedChars);
 
-    if (newData == true) parseData();
+    // if (newData == true) parseData();
     newData = false;
     fakeNewData = false;
 
@@ -219,7 +232,8 @@ void loop()
 
         // turning on the drivers
         // PB5 (gpio 13) is for !enable
-        PORTB &= 0b11011111;
+        // PORTB &= 0b11011111;
+        PORTC &= 0b11111110;
         isIdle = false;
 
         // Serial.print(A);
@@ -295,7 +309,8 @@ void loop()
 
         // turning on the drivers
         // PB5 (gpio 13) is for !enable
-        PORTB &= 0b11011111;
+        // PORTB &= 0b11011111;
+        PORTC &= 0b11111110;
         isIdle = false;
 
         // confirming the command
@@ -417,7 +432,8 @@ void loop()
         if (millis() - idleTime > idleTimeDelay)
         {
           // PB5 (input 13) is for !enable
-          PORTB |= 0b00100000;
+          // PORTB |= 0b00100000;
+          PORTC |= 0b00000001;
         }
       }
     }
@@ -438,6 +454,26 @@ void loop()
 // *****************
 // *** Functions ***
 // *****************
+
+// receiving from the CAN
+
+void recFromCan()
+{
+   if (mcp2515.readMessage(&canMsg) == MCP2515::ERROR_OK) {
+     // checking if the adress is the right one
+     // 102 is set as Mariola drive address 
+     if (canMsg.can_id == 102 && canMsg.can_dlc > 4){
+       // the first data byt is command
+       command = canMsg.data[0];
+
+       for (int i=1; i < canMsg.can_dlc; i++){
+         param[i-1] = canMsg.data[i];
+       }
+       newData = true;
+       
+     }
+   }
+}
 
 void recvWithStartEndMarkers()
 {
