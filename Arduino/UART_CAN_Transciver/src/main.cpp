@@ -53,9 +53,6 @@ void loop()
     strcpy(tempChars, receivedChars);
     parseData();
 
-    Serial.print("command: ");
-    Serial.println(command);
-
     sendToCan(102);
     newData = false;
     Serial.println("Data sent to CAN");
@@ -70,18 +67,46 @@ void loop()
 // receiving from the CAN
 void sendToCan(int address)
 {
+  int msgBytes = 7;
   canMsg.can_id = address;
-  canMsg.can_dlc = 6;
-  canMsg.data[0] = command;
-  Serial.println(command);
+  canMsg.can_dlc = msgBytes;
+  canMsg.data[0] = (uint8_t)command;
 
-  for (int i=1; i < 6; i++)
+  int p = 0;
+  for (int i=1; i < msgBytes-1; i+=2)
   {
-    canMsg.data[i] = param[i-1];
-    Serial.println(param[i-1]);
+    // Union use for data conversion
+    union tVal 
+    {
+      /* data */
+      int t_int;
+      byte t_byte[2];
+    } t;
+
+    t.t_int = param[p]; 
+    canMsg.data[i] = t.t_byte[1];
+    canMsg.data[i+1] = t.t_byte[0];
+    Serial.println(canMsg.data[i]);
+    Serial.println(canMsg.data[i+1]);
+    p++;
   }
   mcp2515.sendMessage(&canMsg);
 }
+
+// void sendToCan(int address)
+// {
+//   canMsg.can_id = address;
+//   canMsg.can_dlc = 6;
+//   canMsg.data[0] = command;
+//   Serial.println(command);
+
+//   for (int i=1; i < 6; i++)
+//   {
+//     canMsg.data[i] = param[i-1];
+//     Serial.println(param[i-1]);
+//   }
+//   mcp2515.sendMessage(&canMsg);
+// }
 
 
 void recFromCan()
@@ -89,15 +114,26 @@ void recFromCan()
    if (mcp2515.readMessage(&canMsg) == MCP2515::ERROR_OK) {
      // checking if the adress is the right one
      // 102 is set as Mariola drive address 
-     if (canMsg.can_id == 102 && canMsg.can_dlc > 4){
+      int msgBytes = 7;
+      if (canMsg.can_id == 102 && canMsg.can_dlc > 4){
        // the first data byt is command
        command = canMsg.data[0];
 
-       for (int i=1; i < canMsg.can_dlc; i++){
-         param[i] = canMsg.data[i];
-       }
+      for (int i=1; i < msgBytes; i+=2)
+      {
+        // Union use for data conversion
+        union tVal 
+        {
+          /* data */
+          int t_int;
+          byte t_byte[2];
+        } t;
+
+        t.t_byte[1] = canMsg.data[i];
+        t.t_byte[0] = canMsg.data[i+1];
+        param[i-1] = t.t_int; 
+      }
        newData = true;
-       
      }
    }
 }

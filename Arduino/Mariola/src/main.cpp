@@ -15,8 +15,8 @@ AccelStepper M2(AccelStepper::DRIVER, 4, 5);
 AccelStepper M3(AccelStepper::DRIVER, 6, 7);
 AccelStepper M4(AccelStepper::DRIVER, 8, 9);
 
-float maxSpeed = 4000.0;
-float maxAccl = 500.0;
+float maxSpeed = 8000.0;
+float maxAccl = 1000.0;
 float accl = maxAccl;
 float speed = maxSpeed;
 const int pulses_per_step = 200 * 8; // for 1/8 step
@@ -456,24 +456,58 @@ void loop()
 // *****************
 
 // receiving from the CAN
-
 void recFromCan()
 {
    if (mcp2515.readMessage(&canMsg) == MCP2515::ERROR_OK) {
      // checking if the adress is the right one
      // 102 is set as Mariola drive address 
-     if (canMsg.can_id == 102 && canMsg.can_dlc > 4){
+     Serial.println("reading...");
+      int msgBytes = 7;
+      if (canMsg.can_id == 102 ){
        // the first data byt is command
        command = canMsg.data[0];
 
-       for (int i=1; i < canMsg.can_dlc; i++){
-         param[i-1] = canMsg.data[i];
-       }
+      uint8_t p = 0;
+      for (int i=1; i < msgBytes; i+=2)
+      {
+        // Union use for data conversion
+        union tVal 
+        {
+          /* data */
+          int t_int;
+          byte t_byte[2];
+        } t;
+
+        t.t_byte[1] = canMsg.data[i];
+        t.t_byte[0] = canMsg.data[i+1];
+        param[p] = t.t_int; 
+        Serial.println(param[p]);
+
+        p++;
+      }
        newData = true;
-       
      }
    }
+   else {
+   }
 }
+// void recFromCan()
+// {
+//    if (mcp2515.readMessage(&canMsg) == MCP2515::ERROR_OK) {
+//      // checking if the adress is the right one
+//      // 102 is set as Mariola drive address 
+//      if (canMsg.can_id == 102 && canMsg.can_dlc > 4){
+//        // the first data byt is command
+//        command = canMsg.data[0];
+
+//        for (int i=1; i < canMsg.can_dlc; i++){
+//          param[i-1] = canMsg.data[i];
+//        }
+//        newData = true;
+       
+//      }
+//    }
+// }
 
 void recvWithStartEndMarkers()
 {
