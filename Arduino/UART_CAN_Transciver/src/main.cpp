@@ -68,27 +68,41 @@ void loop()
 void sendToCan(int address)
 {
   int msgBytes = 7;
-  canMsg.can_id = address;
   canMsg.can_dlc = msgBytes;
   canMsg.data[0] = (uint8_t)command;
 
-  int p = 0;
-  for (int i=1; i < msgBytes-1; i+=2)
-  {
-    // Union use for data conversion
-    union tVal 
-    {
-      /* data */
-      int t_int;
-      byte t_byte[2];
-    } t;
+  if (command == 41){
+    address = 202;
+    canMsg.can_id = address;
+    msgBytes = 2;
+    canMsg.can_dlc = msgBytes;
 
-    t.t_int = param[p]; 
-    canMsg.data[i] = t.t_byte[1];
-    canMsg.data[i+1] = t.t_byte[0];
-    Serial.println(canMsg.data[i]);
-    Serial.println(canMsg.data[i+1]);
-    p++;
+    canMsg.data[0] = param[0];
+    canMsg.data[1] = param[1];
+
+  }
+
+  else
+  {
+    canMsg.can_id = address;
+    int p = 0;
+    for (int i=1; i < msgBytes-1; i+=2)
+    {
+      // Union use for data conversion
+      union tVal 
+      {
+        /* data */
+        int t_int;
+        byte t_byte[2];
+      } t;
+
+      t.t_int = param[p]; 
+      canMsg.data[i] = t.t_byte[1];
+      canMsg.data[i+1] = t.t_byte[0];
+      Serial.println(canMsg.data[i]);
+      Serial.println(canMsg.data[i+1]);
+      p++;
+    }
   }
   mcp2515.sendMessage(&canMsg);
 }
