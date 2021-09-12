@@ -27,6 +27,7 @@ const int pos0 = 0;
 const int servo_count = 16;
 
 uint8_t servos_pos[servo_count] = {0};
+
 float servos_curr[servo_count] = {0};
 
 unsigned long now;
@@ -50,13 +51,23 @@ void setup()
   pwm.begin();
   pwm.setOscillatorFrequency(27000000);
   pwm.setPWMFreq(SERVO_FREQ); // Analog servos run at ~50 Hz updates
+  delay(100);
+
+  servos_pos[7] = 85;
+  servos_pos[6] = 45;
+  servos_pos[0] = 150;
+  servos_pos[1] = 45;
+  servos_pos[15] = 5;
+  servos_pos[14] = 99;
 
   Serial.print("Resetting Servo: ");
   for (int i = 0; i < servo_count; i++)
   {
+    servos_curr[i] = servos_pos[i];
     Serial.print(i);
     Serial.print(" ");
-    pwm.setPWM(i, 0, (int)map(pos0, 0, 180, SERVOMIN, SERVOMAX));
+    Serial.println(servos_curr[i]);
+    pwm.setPWM(i, 0, (int)map(servos_curr[i], 0, 180, SERVOMIN, SERVOMAX));
     delay(10);
   }
 
@@ -69,12 +80,12 @@ recFromCan();
 now = millis();
 
 // handling the servo slope moving
-  if (now > last + 1){
+  if (now > last + 10){
     last = now;
     
     for (uint8_t s=0; s < servo_count; s++){
         if  (servos_curr[s] != servos_pos[s]){
-            servos_curr[s] = (0.995 * servos_curr[s] + 0.005 * servos_pos[s]);
+            servos_curr[s] = (0.95 * servos_curr[s] + 0.05 * servos_pos[s]);
             pwm.setPWM(s, 0, (int)map(servos_curr[s], 0, 180, SERVOMIN, SERVOMAX));      
           }
     }
