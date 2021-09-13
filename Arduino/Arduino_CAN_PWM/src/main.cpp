@@ -57,6 +57,7 @@ void setup()
   servos_pos[6] = 45;
   servos_pos[0] = 150;
   servos_pos[1] = 45;
+  servos_pos[2] = 160;
   servos_pos[15] = 5;
   servos_pos[14] = 99;
 
