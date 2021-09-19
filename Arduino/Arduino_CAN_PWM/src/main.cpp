@@ -16,8 +16,10 @@ Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 
 // defining the values used for PWM servo control
 // those were selected after experiment with the real used hw servos
-#define SERVOMIN 160  // This is the 'minimum' pulse length count (out of 4096)
-#define SERVOMAX 505  // This is the 'maximum' pulse length count (out of 4096)
+// #define SERVOMIN 160  // This is the 'minimum' pulse length count (out of 4096)
+// #define SERVOMAX 505  // This is the 'maximum' pulse length count (out of 4096)
+#define SERVOMIN 170  // This is the 'minimum' pulse length count (out of 4096)
+#define SERVOMAX 495  // This is the 'maximum' pulse length count (out of 4096)
 #define SERVO_FREQ 50 // Analog servos run at ~50 Hz updates
 
 // for servos attached to the PWM module
@@ -29,6 +31,7 @@ const int servo_count = 16;
 uint8_t servos_pos[servo_count] = {0};
 
 float servos_curr[servo_count] = {0};
+bool servos_interpolate[servo_count] = {true};
 
 unsigned long now;
 unsigned long last = 0;
@@ -60,6 +63,14 @@ void setup()
   servos_pos[2] = 160;
   servos_pos[15] = 5;
   servos_pos[14] = 99;
+  servos_pos[13] = 0;
+
+  servos_interpolate[0]  = false;
+  servos_interpolate[1] = false;
+  servos_interpolate[2] = false;
+  servos_interpolate[15] = false;
+  servos_interpolate[14] = false;
+  servos_interpolate[13] = false;
 
   Serial.print("Resetting Servo: ");
   for (int i = 0; i < servo_count; i++)
@@ -85,10 +96,15 @@ now = millis();
     last = now;
     
     for (uint8_t s=0; s < servo_count; s++){
-        if  (servos_curr[s] != servos_pos[s]){
-            servos_curr[s] = (0.95 * servos_curr[s] + 0.05 * servos_pos[s]);
+        // if  (servos_curr[s] != servos_pos[s]){
+            if (servos_interpolate[s]){
+              servos_curr[s] = (0.95 * servos_curr[s] + 0.05 * servos_pos[s]);
+            }
+            else {
+              servos_curr[s] = (0.3 * servos_curr[s] + 0.7 * servos_pos[s]);
+            }
             pwm.setPWM(s, 0, (int)map(servos_curr[s], 0, 180, SERVOMIN, SERVOMAX));      
-          }
+          // }
     }
   }
 
@@ -102,7 +118,7 @@ void recFromCan()
      // 102 is set as Mariola drive address 
      Serial.print(" can msg.");
       if (canMsg.can_id == 202 ){
-        // the first data byt is command
+        // the first data byte is command
         
         int msgBytesPairs = canMsg.can_dlc / 2;
         Serial.println(msgBytesPairs);
@@ -119,7 +135,18 @@ void recFromCan()
           servos_pos[servo] = pos;
         }
      }
+
+      if (canMsg.can_id == 203 ){
+        // receiving data for the hands.
+        /*
+        Assumed structure
+        0 hand num
+        1 2 - first 
+        */
+
+      }
    }
    else {
+    //  Error or no message
    }
 }
